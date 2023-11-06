@@ -15,12 +15,11 @@ def set_servo_angle(servo, angle):
     servo.write(angle)
 
 try:
-    set_servo_angle(servo1, 100)
-    time.sleep(1)
-    set_servo_angle(servo2, 50)
-    time.sleep(1)
-    set_servo_angle(servo3, 100)
-    time.sleep(1)
+    while True:
+        set_servo_angle(servo1, 100)
+        set_servo_angle(servo2, 50)
+        set_servo_angle(servo3, 100)
+        time.sleep(1)
 
 except KeyboardInterrupt:
     board.exit()
