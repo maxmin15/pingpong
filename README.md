@@ -1,36 +1,48 @@
+#include <Servo.h>
 #include <Firmata.h>
 
-void setup() {
-  Firmata.begin(57600);
+Servo servos[MAX_SERVOS];
+byte servoPinMap[TOTAL_PINS];
+byte servoCount = 0;
+
+void analogWriteCallback(byte pin, int value)
+{
+  if (IS_PIN_DIGITAL(pin)) {
+    servos[servoPinMap[pin]].write(value);
+  }
+}
+
+void systemResetCallback()
+{
+  servoCount = 0;
+}
+
+void setup()
+{
+  byte pin;
+
+  Firmata.setFirmwareVersion(FIRMATA_FIRMWARE_MAJOR_VERSION, FIRMATA_FIRMWARE_MINOR_VERSION);
   Firmata.attach(ANALOG_MESSAGE, analogWriteCallback);
-  Firmata.attach(SERVO_CONFIG, servoConfigCallback);
-  Firmata.attach(SERVO_WRITE, servoWriteCallback);
+  Firmata.attach(SYSTEM_RESET, systemResetCallback);
+
+  Firmata.begin(57600);
+  systemResetCallback();
+
+  // attach servos from first digital pin up to max number of
+  // servos supported for the board
+  for (pin = 0; pin < TOTAL_PINS; pin++) {
+    if (IS_PIN_DIGITAL(pin)) {
+      if (servoCount < MAX_SERVOS) {
+        servoPinMap[pin] = servoCount;
+        servos[servoPinMap[pin]].attach(PIN_TO_DIGITAL(pin));
+        servoCount++;
+      }
+    }
+  }
 }
 
-void loop() {
-  while (Firmata.available()) {
+void loop()
+{
+  while (Firmata.available())
     Firmata.processInput();
-  }
 }
-
-void analogWriteCallback(byte pin, int value) {
-  if (pin == 9 || pin == 10 || pin == 11) {
-    // 서보 모터 핀이 아닌 경우에는 analogWrite를 호출하지 않도록 수정
-    analogWrite(pin, value);
-  }
-}
-
-void servoConfigCallback(byte pin, int minPulse, int maxPulse) {
-  if (pin == 9 || pin == 10 || pin == 11) {
-    Servo.attach(pin, minPulse, maxPulse);  // Servo.attach에 minPulse와 maxPulse 추가
-  }
-}
-
-void servoWriteCallback(byte pin, int value) {
-  if (pin == 9 || pin == 10 || pin == 11) {
-    Servo.write(pin, value);
-  }
-}
-주요 수정 사항:
-
-analog
