@@ -16,6 +16,10 @@ def set_servo_angle(servo, angle):
 
 try:
     while True:
+        set_servo_angle(servo1, 0)
+        set_servo_angle(servo2, 0)
+        set_servo_angle(servo3, 0)
+        time.sleep(2)
         set_servo_angle(servo1, 100)
         set_servo_angle(servo2, 50)
         set_servo_angle(servo3, 100)
