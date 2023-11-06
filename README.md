@@ -1,48 +1,26 @@
-#include <Servo.h>
-#include <Firmata.h>
+import pyfirmata
+import time
 
-Servo servos[MAX_SERVOS];
-byte servoPinMap[TOTAL_PINS];
-byte servoCount = 0;
 
-void analogWriteCallback(byte pin, int value)
-{
-  if (IS_PIN_DIGITAL(pin)) {
-    servos[servoPinMap[pin]].write(value);
-  }
-}
+port = '/dev/ttyACM0'  # 아두이노 포트
+board = pyfirmata.Arduino(port)
 
-void systemResetCallback()
-{
-  servoCount = 0;
-}
 
-void setup()
-{
-  byte pin;
+servo1 = board.get_pin('d:9:s')  # 9번 핀을 서보 모터 1로 설정
+servo2 = board.get_pin('d:10:s')  # 10번 핀을 서보 모터 2로 설정
+servo3 = board.get_pin('d:11:s')  # 11번 핀을 서보 모터 3로 설정
 
-  Firmata.setFirmwareVersion(FIRMATA_FIRMWARE_MAJOR_VERSION, FIRMATA_FIRMWARE_MINOR_VERSION);
-  Firmata.attach(ANALOG_MESSAGE, analogWriteCallback);
-  Firmata.attach(SYSTEM_RESET, systemResetCallback);
 
-  Firmata.begin(57600);
-  systemResetCallback();
+def set_servo_angle(servo, angle):
+    servo.write(angle)
 
-  // attach servos from first digital pin up to max number of
-  // servos supported for the board
-  for (pin = 0; pin < TOTAL_PINS; pin++) {
-    if (IS_PIN_DIGITAL(pin)) {
-      if (servoCount < MAX_SERVOS) {
-        servoPinMap[pin] = servoCount;
-        servos[servoPinMap[pin]].attach(PIN_TO_DIGITAL(pin));
-        servoCount++;
-      }
-    }
-  }
-}
+try:
+    set_servo_angle(servo1, 100)
+    time.sleep(1)
+    set_servo_angle(servo2, 50)
+    time.sleep(1)
+    set_servo_angle(servo3, 100)
+    time.sleep(1)
 
-void loop()
-{
-  while (Firmata.available())
-    Firmata.processInput();
-}
+except KeyboardInterrupt:
+    board.exit()
