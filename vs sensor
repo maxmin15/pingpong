@@ -1,0 +1,42 @@
+import pyfirmata
+import time
+
+# 아두이노와 시리얼 통신 설정 (COM 포트 및 속도에 따라 변경)
+port = '/dev/ttyACM0'  # 아두이노 포트
+board = pyfirmata.Arduino(port)
+
+# 초음파 센서 핀 설정
+trigPin = 2  # 아두이노 핀 2 (Trig 핀)
+echoPin = 3  # 아두이노 핀 3 (Echo 핀)
+
+# Servo 객체 초기화
+servo1 = board.get_pin('a:0:s')  # 아날로그 핀 0을 서보 모터 1로 설정
+servo2 = board.get_pin('a:1:s')  # 아날로그 핀 1을 서보 모터 2로 설정
+servo3 = board.get_pin('a:2:s')  # 아날로그 핀 2을 서보 모터 3로 설정
+
+# 초음파 센서의 거리 측정 함수
+def get_distance():
+    board.digital[trigPin].write(1)
+    time.sleep(0.00001)
+    board.digital[trigPin].write(0)
+    pulse_duration = board.digital[echoPin].read_pulse(1)
+    distance = pulse_duration * 34000 / 2  # 거리 계산 (단위: 센티미터)
+    return distance
+
+try:
+    while True:
+        distance = get_distance()
+        print(f'Distance: {distance} cm')
+        
+        if distance < 10:  # 물체 감지 시
+            servo1.write(100)
+            servo2.write(50)
+            servo3.write(100)
+        else:  # 물체 미감지 시
+            servo1.write(90)
+            servo2.write(90)
+            servo3.write(90)
+        
+        time.sleep(1)
+except KeyboardInterrupt:
+    board.exit()
