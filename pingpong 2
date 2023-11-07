@@ -1,42 +1,79 @@
-import pyfirmata
-import time
+#include <Servo.h>
+#include <Firmata.h>
 
-# 아두이노와 시리얼 통신 설정 (COM 포트 및 속도에 따라 변경)
-port = '/dev/ttyACM0'  # 아두이노 포트
-board = pyfirmata.Arduino(port)
+Servo servos[MAX_SERVOS];
+byte servoPinMap[TOTAL_PINS];
+byte servoCount = 0;
 
-# 초음파 센서 핀 설정
-trigPin = 2  # 아두이노 핀 2 (Trig 핀)
-echoPin = 3  # 아두이노 핀 3 (Echo 핀)
+const int trigPin = 2;   // 초음파 센서의 Trig 핀 (아두이노 핀 2)
+const int echoPin = 3;   // 초음파 센서의 Echo 핀 (아두이노 핀 3)
 
-# Servo 객체 초기화
-servo1 = board.get_pin('a:0:s')  # 아날로그 핀 0을 서보 모터 1로 설정
-servo2 = board.get_pin('a:1:s')  # 아날로그 핀 1을 서보 모터 2로 설정
-servo3 = board.get_pin('a:2:s')  # 아날로그 핀 2을 서보 모터 3로 설정
+void analogWriteCallback(byte pin, int value)
+{
+  if (IS_PIN_DIGITAL(pin)) {
+    servos[servoPinMap[pin]].write(value);
+  }
+}
 
-# 초음파 센서의 거리 측정 함수
-def get_distance():
-    board.digital[trigPin].write(1)
-    time.sleep(0.00001)
-    board.digital[trigPin].write(0)
-    pulse_duration = board.digital[echoPin].read_pulse(1)
-    distance = pulse_duration * 34000 / 2  # 거리 계산 (단위: 센티미터)
-    return distance
+void systemResetCallback()
+{
+  servoCount = 0;
+}
 
-try:
-    while True:
-        distance = get_distance()
-        print(f'Distance: {distance} cm')
-        
-        if distance < 10:  # 물체 감지 시
-            servo1.write(100)
-            servo2.write(50)
-            servo3.write(100)
-        else:  # 물체 미감지 시
-            servo1.write(90)
-            servo2.write(90)
-            servo3.write(90)
-        
-        time.sleep(1)
-except KeyboardInterrupt:
-    board.exit()
+void setup()
+{
+  byte pin;
+
+  Firmata.setFirmwareVersion(FIRMATA_FIRMWARE_MAJOR_VERSION, FIRMATA_FIRMWARE_MINOR_VERSION);
+  Firmata.attach(ANALOG_MESSAGE, analogWriteCallback);
+  Firmata.attach(SYSTEM_RESET, systemResetCallback);
+
+  Firmata.begin(57600);
+  systemResetCallback();
+
+  // 초음파 센서 핀 설정
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+
+  // attach servos from first digital pin up to max number of
+  // servos supported for the board
+  for (pin = 0; pin < TOTAL_PINS; pin++) {
+    if (IS_PIN_DIGITAL(pin)) {
+      if (servoCount < MAX_SERVOS) {
+        servoPinMap[pin] = servoCount;
+        servos[servoPinMap[pin]].attach(PIN_TO_DIGITAL(pin));
+        servoCount++;
+      }
+    }
+  }
+}
+
+void loop()
+{
+  while (Firmata.available()) {
+    Firmata.processInput();
+  }
+
+  long duration, distance;
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  duration = pulseIn(echoPin, HIGH);
+  distance = (duration / 2) / 29.1;  // 거리 계산 (단위: 센티미터)
+
+  if (distance < 10) {
+    // 물체 감지 시 모터를 동작
+    servos[0].write(100);  // 모터 1을 100도로 설정
+    servos[1].write(50);   // 모터 2를 50도로 설정
+    servos[2].write(100);  // 모터 3을 100도로 설정
+  } else {
+    // 물체 미감지 시 모터를 정지
+    servos[0].write(90);  // 모터 1을 90도로 설정
+    servos[1].write(90);  // 모터 2를 90도로 설정
+    servos[2].write(90);  // 모터 3을 90도로 설정
+  }
+  delay(100);
+}
