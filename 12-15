@@ -27,7 +27,7 @@ while True:
     center_x = int(rows / 2)
     center_y = int(cols / 2)
 
-    # 기존 4번 핀의 모터 동작 코드
+    # 기존 2번 핀의 모터 동작 코드
     for cnt in contours:
         (x, y, w, h) = cv2.boundingRect(cnt)
         cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
