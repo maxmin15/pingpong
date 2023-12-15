@@ -1,11 +1,11 @@
 #include<Servo.h>
 
-Servo X, Y; // 4번 핀과 3번 핀에 연결된 서보 모터 객체 생성
+Servo X, Y; // 2번 핀과 3번 핀에 연결된 서보 모터 객체 생성
 char x;
 long int v;
 
 void setup() {
-  X.attach(4);  // 4번 핀에 서보 모터 연결
+  X.attach(2);  // 2번 핀에 서보 모터 연결
   Y.attach(3);  // 3번 핀에 서보 모터 연결
   Serial.begin(9600);
   X.write(90);
