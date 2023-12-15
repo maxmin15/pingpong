@@ -1,4 +1,4 @@
-#include <Servo.h>
+#include<Servo.h>
 
 Servo X2;
 Servo X3;
@@ -8,10 +8,12 @@ long int v;
 
 void setup() {
   X2.attach(2);
-  X3.attach(3);
+  X3.attach(3);  // X3 모터 추가
+
   Serial.begin(9600);
+
   X2.write(90);
-  X3.write(90);
+  X3.write(90);  // 초기 위치 설정
 }
 
 void loop() {
@@ -20,7 +22,8 @@ void loop() {
     v = Serial.parseInt();
     if (x == 'a') {
       X2.write(v);
-      X3.write(v);
+      X3.write(90);  // X3 모터 초기 위치로 설정
     }
   }
 }
+
