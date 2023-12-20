@@ -49,10 +49,14 @@ while True:
             Xposition -= 2
             ser.write((str(Xposition) + 'a').encode('utf-8'))
            # time.sleep(0.03)
+     
+
+    # Contour 영역이 특정 임계값보다 큰지 확인합니다 (필요에 따라 조정)
         if cv2.contourArea(cnt) > 500:
-        ser.write((str(Xposition) + 'a').encode('utf-8'))  # Send data to Arduino
-        # Set detected flag to true for the Arduino code to perform 90-degree oscillation
-        detected = True
+            ser.write((str(Xposition) + 'b').encode('utf-8'))  # 3번 모터 동작을 트리거하기 위해 'b'를 전송
+            detected = True
+
+# ... (기존 코드의 나머지 부분)
 
 
         break
@@ -95,9 +99,13 @@ void loop() {
     v = Serial.parseInt();
     if (x == 'a') {
       X2.write(v);
-      detected = true;
-      lastDetectionTime = millis(); // Update the time of last detection
+    } else if (x == 'b') {
+      X3.write(0); // 3번 모터를 0도로 이동
+      delay(1000); // 서보가 해당 위치로 이동하기를 기다립니다.
+      X3.write(90); // 3번 모터를 초기 위치로 이동
     }
+    detected = false; // 감지 플래그 재설정
+    lastDetectionTime = millis(); // 마지막 감지 시간 업데이트
     delay(10);
   }
 
