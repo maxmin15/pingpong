@@ -12,10 +12,10 @@ Yposition = 90
 while True:
     _, frame = cap.read()
     frame = cv2.flip(frame, 1)
-    frame = cv2.resize(frame, (300, 300))
+    frame = cv2.resize(frame, (640, 480))
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    red_lower = np.array([161, 155, 84], np.uint8)
-    red_upper = np.array([180, 255, 255], np.uint8)
+    red_lower = np.array([11, 100, 141], np.uint8)
+    red_upper = np.array([30, 255, 255], np.uint8)
     mask = cv2.inRange(hsv, red_lower, red_upper)
     contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     contours = sorted(contours,key=lambda x:cv2.contourArea(x),reverse=True)
