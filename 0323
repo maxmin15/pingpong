@@ -1,0 +1,139 @@
+import serial
+import time
+import cv2
+import numpy as np
+
+cap = cv2.VideoCapture(0)
+ser = serial.Serial("/dev/ttyACM0", '9600', timeout=2)
+
+Xposition = 90
+Yposition = 90
+
+while True:
+    _, frame = cap.read()
+    frame = cv2.flip(frame, 1)
+    frame = cv2.resize(frame, (640, 480))
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    red_lower = np.array([11, 100, 141], np.uint8)
+    red_upper = np.array([30, 255, 255], np.uint8)
+    mask = cv2.inRange(hsv, red_lower, red_upper)
+    contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours = sorted(contours,key=lambda x:cv2.contourArea(x),reverse=True)
+    rows, cols, _ = frame.shape
+    center_x = int(rows / 2)
+    center_y = int(cols / 2)
+
+    for cnt in contours:
+        (x, y, w, h) = cv2.boundingRect(cnt)
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        text = "x = "+str(x)+"y = "+str(y)
+        cv2.putText(frame, text, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.50, (0, 0, 255))
+        #////////////////////////////////////////////////////////////////////
+        medium_x = int((x + x+w)/2)
+        medium_y = int((y + y+h)/2)
+        #////////////////////////////////////////////////////////////////////
+        cv2.line(frame, (medium_x,0),(medium_x,600),(0,255,0),2)
+        text2 = "mediumX = " + str(medium_x)
+        cv2.putText(frame, text2, (0, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.50, (0, 255, 50))
+        #////////////////////////////////////////////////////////////////////
+        cv2.line(frame, (0, medium_y), (600, medium_y), (0, 255, 0), 2)
+        text3 = "mediumY = " + str(medium_y)
+        cv2.putText(frame, text3, (0, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.50, (0, 255, 50))
+
+        # ////////////////////////////////////////////////////////////////////
+        if medium_x > center_x +40:
+            Xposition += 2
+            ser.write((str(Xposition) + 'a').encode('utf-8'))
+           # time.sleep(0.03)
+        if medium_x < center_x -40:
+            Xposition -= 2
+            ser.write((str(Xposition) + 'a').encode('utf-8'))
+           # time.sleep(0.03)
+    
+        # Contour 영역이 특정 임계값보다 큰지 확인합니다 (필요에 따라 조정)
+        if cv2.contourArea(cnt) > 500:
+            ser.write((str(Xposition) + 'a').encode('utf-8'))  # Arduino에 데이터 전송
+        # 90도 오실레이션을 수행하기 위해 Arduino 코드에서 사용되는 감지된 플래그 설정
+            detected = True
+
+        # ... (기존 코드의 나머지 부분)
+
+        break
+
+
+    cv2.imshow("frame",frame)
+  #  cv2.imshow("mask",mask )
+    key = cv2.waitKey(1)
+    if key ==27:
+        break
+cap.release()
+cv2.destroyAllWindows()
+
+
+
+
+아두이노
+
+
+
+#include <Servo.h>
+
+Servo X2;
+Servo X3; // 3번 모터용 서보 추가
+Servo X4;
+
+char x;
+long int v;
+bool detected = false;
+unsigned long lastDetectionTime = 0;
+
+void setup() {
+  X2.attach(2);
+  X3.attach(3); // 3번 모터를 핀 3에 연결
+  X4.attach(4);
+  Serial.begin(9600);
+  X2.write(90);
+  X3.write(90); // 3번 모터의 초기 위치
+  X4.write(90);
+}
+
+void loop() {
+  if (Serial.available() > 2) {
+    x = Serial.read();
+    v = Serial.parseInt();
+    if (x == 'a') {
+      X2.write(v);
+      detected = true;
+      lastDetectionTime = millis(); // 마지막 감지 시간 업데이트
+    }
+    delay(10);
+  }
+
+  // 공이 감지되었는지 및 마지막 감지 이후 충분한 시간이 지났는지 확인
+  if (detected && millis() - lastDetectionTime > 3000) {
+    // 3번 모터의 현재 각도를 읽기
+    int angle = X3.read();
+    
+    // Servo X3가 40도 이하인지 확인
+    if (angle < 40) {
+      // Servo X4를 왼쪽으로 40도 움직임
+      X4.write(50); // 왼쪽으로 40도 움직이게 될 각도
+      delay(1000); // 1초 동안 대기
+      X4.write(90); // 다시 중앙 위치로 돌아옴
+    }
+    
+    // Servo X3가 140도 이상인지 확인
+    if (angle > 140) {
+      // Servo X4를 오른쪽으로 40도 움직임
+      X4.write(130); // 오른쪽으로 40도 움직이게 될 각도
+      delay(1000); // 1초 동안 대기
+      X4.write(90); // 다시 중앙 위치로 돌아옴
+    }
+    
+    // 3번 모터를 0도로 이동
+    X3.write(0);
+    delay(1000); // 서보가 해당 위치로 이동하기를 기다림
+    X3.write(90); // 3번 모터를 초기 위치로 이동
+    detected = false; // 감지 플래그 재설정
+  }
+}
