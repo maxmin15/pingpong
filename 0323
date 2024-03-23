@@ -80,7 +80,6 @@ cv2.destroyAllWindows()
 
 Servo X2;
 Servo X3; // 3번 모터용 서보 추가
-Servo X4;
 
 char x;
 long int v;
@@ -90,11 +89,9 @@ unsigned long lastDetectionTime = 0;
 void setup() {
   X2.attach(2);
   X3.attach(3); // 3번 모터를 핀 3에 연결
-  X4.attach(4);
   Serial.begin(9600);
   X2.write(90);
   X3.write(90); // 3번 모터의 초기 위치
-  X4.write(90);
 }
 
 void loop() {
@@ -110,30 +107,23 @@ void loop() {
   }
 
   // 공이 감지되었는지 및 마지막 감지 이후 충분한 시간이 지났는지 확인
-  if (detected && millis() - lastDetectionTime > 3000) {
-    // 3번 모터의 현재 각도를 읽기
-    int angle = X3.read();
+  if (detected && millis() - lastDetectionTime > 500) {
+    // X2 서보의 현재 각도 읽기
+    int angleX2 = X2.read();
     
-    // Servo X3가 40도 이하인지 확인
-    if (angle < 40) {
-      // Servo X4를 왼쪽으로 40도 움직임
-      X4.write(50); // 왼쪽으로 40도 움직이게 될 각도
-      delay(1000); // 1초 동안 대기
-      X4.write(90); // 다시 중앙 위치로 돌아옴
+    // X2가 90도에서 180도 사이에 있을 때
+    if (angleX2 > 90 && angleX2 <= 180) {
+      X3.write(180); // X3를 오른쪽으로 90도 회전
+      delay(1000); // 1초 대기
+      X3.write(90); // 다시 초기 위치로 돌아옴
+    }
+    // X2가 90도에서 0도 사이에 있을 때
+    else if (angleX2 >= 0 && angleX2 < 90) {
+      X3.write(0); // X3를 왼쪽으로 90도 회전
+      delay(1000); // 1초 대기
+      X3.write(90); // 다시 초기 위치로 돌아옴
     }
     
-    // Servo X3가 140도 이상인지 확인
-    if (angle > 140) {
-      // Servo X4를 오른쪽으로 40도 움직임
-      X4.write(130); // 오른쪽으로 40도 움직이게 될 각도
-      delay(1000); // 1초 동안 대기
-      X4.write(90); // 다시 중앙 위치로 돌아옴
-    }
-    
-    // 3번 모터를 0도로 이동
-    X3.write(0);
-    delay(1000); // 서보가 해당 위치로 이동하기를 기다림
-    X3.write(90); // 3번 모터를 초기 위치로 이동
     detected = false; // 감지 플래그 재설정
   }
 }
