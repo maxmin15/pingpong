@@ -51,4 +51,23 @@ void loop() {
     
     detected = false; // 감지 플래그 재설정
   }
+if (detected && millis() - lastDetectionTime > 500) {
+    // X2 서보의 현재 각도 읽기
+    int angleX2 = X2.read();
+    
+    // X2가 90도에서 180도 사이에 있을 때
+    if (angleX2 > 90 && angleX2 <= 180) {
+      X3.write(180); // X3를 오른쪽으로 90도 회전
+      delay(1000); // 1초 대기
+      X3.write(90); // 다시 초기 위치로 돌아옴
+    }
+    // X2가 90도에서 0도 사이에 있을 때
+    else if (angleX2 >= 0 && angleX2 < 90) {
+      X3.write(0); // X3를 왼쪽으로 90도 회전
+      delay(1000); // 1초 대기
+      X3.write(90); // 다시 초기 위치로 돌아옴
+    }
+    
+    detected = false; // 감지 플래그 재설정
+  }
 }
