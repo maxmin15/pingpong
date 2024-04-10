@@ -1,0 +1,36 @@
+#include <Servo.h>
+
+Servo X2;
+Servo X3;
+
+char x;
+long int v;
+bool detected = false;
+unsigned long lastDetectionTime = 0;
+
+void setup() {
+  X2.attach(2);
+  X3.attach(3);
+  Serial.begin(115200); // 시리얼 통신 속도를 높임
+  X2.write(90);
+  X3.write(90);
+}
+
+void loop() {
+  while (Serial.available() > 2) { // 시리얼 버퍼를 빠르게 비움
+    x = Serial.read();
+    v = Serial.parseInt();
+    if (x == 'a') {
+      X2.write(v);
+      detected = true;
+      lastDetectionTime = millis();
+    }
+  }
+
+  if (detected && millis() - lastDetectionTime > 3000) {
+    X3.write(0);
+    delay(1000);
+    X3.write(90);
+    detected = false;
+  }
+}
