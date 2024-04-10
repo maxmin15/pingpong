@@ -1,36 +1,69 @@
+import serial
+import math
+import time
+
+# 아두이노와의 시리얼 통신 설정
+ser = serial.Serial('COM3', 9600, timeout=1)
+
+# 로봇 팔 길이 설정 (팔 1, 팔 2)
+L1 = 10  # 팔 1 길이 (cm)
+L2 = 10  # 팔 2 길이 (cm)
+
+def calculate_angles(x, y):
+    # 목표 위치로부터 각 관절의 각도를 계산하는 함수
+    # 역기구학 알고리즘을 사용하여 각도를 계산합니다.
+    # x, y는 로봇 팔의 끝 부분의 좌표입니다.
+    
+    # theta2 계산
+    D = (x**2 + y**2 - L1**2 - L2**2) / (2 * L1 * L2)
+    theta2 = math.atan2(-math.sqrt(1 - D**2), D)
+
+    # theta1 계산
+    K1 = L1 + L2 * math.cos(theta2)
+    K2 = L2 * math.sin(theta2)
+    theta1 = math.atan2(y, x) - math.atan2(K2, K1)
+
+    return math.degrees(theta1), math.degrees(theta2)
+
+def send_angles(theta1, theta2):
+    # 각도 정보를 아두이노로 전송하는 함수
+    ser.write(f"{theta1:.2f},{theta2:.2f}\n".encode())
+
+# 테스트할 목표 위치 (cm 단위)
+target_x = 10
+target_y = 10
+
+# 각도 계산 및 전송
+theta1, theta2 = calculate_angles(target_x, target_y)
+send_angles(theta1, theta2)
+
+
+
+
+
 #include <Servo.h>
 
-Servo X2;
-Servo X3;
-
-char x;
-long int v;
-bool detected = false;
-unsigned long lastDetectionTime = 0;
+Servo servo1;
+Servo servo2;
 
 void setup() {
-  X2.attach(2);
-  X3.attach(3);
-  Serial.begin(115200); // 시리얼 통신 속도를 높임
-  X2.write(90);
-  X3.write(90);
+  servo1.attach(9);  // 서보 1 핀
+  servo2.attach(10); // 서보 2 핀
+  Serial.begin(9600); // 시리얼 통신 시작
 }
 
 void loop() {
-  while (Serial.available() > 2) { // 시리얼 버퍼를 빠르게 비움
-    x = Serial.read();
-    v = Serial.parseInt();
-    if (x == 'a') {
-      X2.write(v);
-      detected = true;
-      lastDetectionTime = millis();
-    }
-  }
-
-  if (detected && millis() - lastDetectionTime > 3000) {
-    X3.write(0);
-    delay(1000);
-    X3.write(90);
-    detected = false;
+  if (Serial.available() > 0) {
+    // 시리얼 데이터가 있는지 확인
+    String data = Serial.readStringUntil('\n');
+    int commaIndex = data.indexOf(',');
+    
+    // 쉼표를 기준으로 각도 추출
+    float theta1 = data.substring(0, commaIndex).toFloat();
+    float theta2 = data.substring(commaIndex + 1).toFloat();
+    
+    // 각도를 서보모터에 적용
+    servo1.write(theta1);
+    servo2.write(theta2);
   }
 }
