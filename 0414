@@ -1,0 +1,95 @@
+import serial
+import cv2
+import numpy as np
+
+cap = cv2.VideoCapture(0)
+ser = serial.Serial("/dev/ttyACM0", 4800, timeout=2)  # 시리얼 통신 속도 변경
+
+Xposition = 90
+
+while True:
+    _, frame = cap.read()
+    frame = cv2.flip(frame, 1)
+    frame = cv2.resize(frame, (640, 480))
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    red_lower = np.array([11, 100, 141], np.uint8)
+    red_upper = np.array([30, 255, 255], np.uint8)
+    mask = cv2.inRange(hsv, red_lower, red_upper)
+    contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours = sorted(contours, key=lambda x: cv2.contourArea(x), reverse=True)
+
+    for cnt in contours:
+        (x, y, w, h) = cv2.boundingRect(cnt)
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        text = "x = "+str(x)+"y = "+str(y)
+        cv2.putText(frame, text, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.50, (0, 0, 255))
+
+        medium_x = int((x + x+w)/2)
+
+        if medium_x > 320 + 40:
+            Xposition += 2
+            ser.write((str(Xposition) + 'a').encode('utf-8'))
+        if medium_x < 320 - 40:
+            Xposition -= 2
+            ser.write((str(Xposition) + 'a').encode('utf-8'))
+
+        break
+
+    cv2.imshow("frame", frame)
+    key = cv2.waitKey(1)
+    if key == 27:
+        break
+
+cap.release()
+cv2.destroyAllWindows()
+
+
+-----------------------------------------------------------------
+
+
+#include<Servo.h>
+
+Servo X2;
+Servo X3; // 3번 모터용 서보 추가
+
+char x;
+long int v;
+bool detected = false;
+unsigned long lastDetectionTime = 0;
+unsigned long lastMotorControlTime = 0; // 마지막으로 모터 제어를 한 시간
+
+void setup() {
+  X2.attach(2);
+  X3.attach(3); // 3번 모터를 핀 3에 연결
+  Serial.begin(4800);
+  X2.write(90);
+  X3.write(90); // 3번 모터의 초기 위치
+}
+
+void loop() {
+  unsigned long currentTime = millis(); // 현재 시간
+
+  // 카메라에서 인식된 공의 유무를 주기적으로 확인
+  if (currentTime - lastMotorControlTime >= 100) { // 100밀리초마다 실행
+    if (Serial.available() > 2) {
+      x = Serial.read();
+      v = Serial.parseInt();
+      if (x == 'a') {
+        X2.write(v);
+        detected = true;
+        lastDetectionTime = currentTime; // 마지막 감지 시간 업데이트
+      }
+      delay(10);
+    }
+
+    // 공이 감지되었는지 및 마지막 감지 이후 충분한 시간이 지났는지 확인
+    if (detected && currentTime - lastDetectionTime > 3000) {
+      X3.write(0); // 3번 모터를 0도로 이동
+      delay(1000); // 서보가 해당 위치로 이동하기를 기다립니다.
+      X3.write(90); // 3번 모터를 초기 위치로 이동
+      detected = false; // 감지 플래그 재설정
+    }
+
+    lastMotorControlTime = currentTime; // 마지막으로 모터 제어를 한 시간 업데이트
+  }
+}
