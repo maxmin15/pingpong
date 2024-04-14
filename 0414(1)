@@ -1,61 +1,61 @@
-	import serial
-	import cv2
-	import numpy as np
-	import threading
-	
-	# 이미지 처리 스레드 클래스
-	class ImageProcessingThread(threading.Thread):
-	    def __init__(self, cap, ser):
-	        threading.Thread.__init__(self)
-	        self.cap = cap
-	        self.ser = ser
-	        self.Xposition = 90
-	
-	    def run(self):
-	        while True:
-	            _, frame = self.cap.read()
-	            frame = cv2.flip(frame, 1)
-	            frame = cv2.resize(frame, (640, 480))
-	            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-	            red_lower = np.array([11, 100, 141], np.uint8)
-	            red_upper = np.array([30, 255, 255], np.uint8)
-	            mask = cv2.inRange(hsv, red_lower, red_upper)
-	            contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-	            contours = sorted(contours, key=lambda x: cv2.contourArea(x), reverse=True)
-	
-	            for cnt in contours:
-	                (x, y, w, h) = cv2.boundingRect(cnt)
-	                medium_x = int((x + x+w)/2)
-	
-	                if medium_x > 320 + 40:
-	                    self.Xposition += 2
-	                    self.ser.write((str(self.Xposition) + '\n').encode('utf-8'))
-	                if medium_x < 320 - 40:
-	                    self.Xposition -= 2
-	                    self.ser.write((str(self.Xposition) + '\n').encode('utf-8'))
-	
-	                break
-	
-	# 시리얼 통신 스레드 함수
-	def serial_thread(ser):
-	    while True:
-	        # 시리얼 통신 코드 작성
-	        pass
-	
-	if __name__ == "__main__":
-	    cap = cv2.VideoCapture(0)
-	    ser = serial.Serial("/dev/ttyACM0", 4800, timeout=2)
-	
-	    image_thread = ImageProcessingThread(cap, ser)
-	    image_thread.start()
-	
-	    serial_thread = threading.Thread(target=serial_thread, args=(ser,))
-	    serial_thread.start()
-	
-	    image_thread.join()
-	    serial_thread.join()
-	
-	    cap.release()
+import serial
+import cv2
+import numpy as np
+import threading
+
+# 이미지 처리 스레드 클래스
+class ImageProcessingThread(threading.Thread):
+    def __init__(self, cap, ser):
+        threading.Thread.__init__(self)
+        self.cap = cap
+        self.ser = ser
+        self.Xposition = 90
+
+    def run(self):
+        while True:
+            _, frame = self.cap.read()
+            frame = cv2.flip(frame, 1)
+            frame = cv2.resize(frame, (640, 480))
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            red_lower = np.array([11, 100, 141], np.uint8)
+            red_upper = np.array([30, 255, 255], np.uint8)
+            mask = cv2.inRange(hsv, red_lower, red_upper)
+            contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            contours = sorted(contours, key=lambda x: cv2.contourArea(x), reverse=True)
+
+            for cnt in contours:
+                (x, y, w, h) = cv2.boundingRect(cnt)
+                medium_x = int((x + x+w)/2)
+
+                if medium_x > 320 + 40:
+                    self.Xposition += 2
+                    self.ser.write((str(self.Xposition) + '\n').encode('utf-8'))
+                if medium_x < 320 - 40:
+                    self.Xposition -= 2
+                    self.ser.write((str(self.Xposition) + '\n').encode('utf-8'))
+
+                break
+
+# 시리얼 통신 스레드 함수
+def serial_thread(ser):
+    while True:
+        # 시리얼 통신 코드 작성
+        pass
+
+if __name__ == "__main__":
+    cap = cv2.VideoCapture(0)
+    ser = serial.Serial("/dev/ttyACM0", 4800, timeout=2)
+
+    image_thread = ImageProcessingThread(cap, ser)
+    image_thread.start()
+
+    serial_thread = threading.Thread(target=serial_thread, args=(ser,))
+    serial_thread.start()
+
+    image_thread.join()
+    serial_thread.join()
+
+    cap.release()
     cv2.destroyAllWindows()
 
 ------------------------------------------------
