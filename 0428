@@ -1,0 +1,106 @@
+import serial
+import cv2
+import numpy as np
+import threading
+
+# 이미지 처리 스레드 클래스
+class ImageProcessingThread(threading.Thread):
+    def __init__(self, cap, ser):
+        threading.Thread.__init__(self)
+        self.cap = cap
+        self.ser = ser
+        self.Xposition = 90
+        self.Yposition = 90
+
+    def run(self):
+        while True:
+            _, frame = self.cap.read()
+            frame = cv2.flip(frame, 1)
+            frame = cv2.resize(frame, (640, 480))
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            red_lower = np.array([11, 100, 141], np.uint8)
+            red_upper = np.array([30, 255, 255], np.uint8)
+            mask = cv2.inRange(hsv, red_lower, red_upper)
+            contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            contours = sorted(contours, key=lambda x: cv2.contourArea(x), reverse=True)
+
+            for cnt in contours:
+                (x, y, w, h) = cv2.boundingRect(cnt)
+                medium_x = int((x + x+w) / 2)
+
+                # Xposition 변경
+                if medium_x > 320 + 40:
+                    self.Xposition += 2
+                    self.ser.write((str(self.Xposition) + '\n').encode('utf-8'))
+                elif medium_x < 320 - 40:
+                    self.Xposition -= 2
+                    self.ser.write((str(self.Xposition) + '\n').encode('utf-8'))
+
+                # 서보모터3 각도 제어
+                if medium_x > 320:
+                    angle = map_value(medium_x, 320, 640, 90, 180)
+                else:
+                    angle = map_value(medium_x, 0, 320, 90, 0)
+
+                self.ser.write((str(angle) + '\n').encode('utf-8'))
+
+                break
+
+# 값 범위 변환 함수
+def map_value(value, from_low, from_high, to_low, to_high):
+    return int((value - from_low) * (to_high - to_low) / (from_high - from_low) + to_low)
+
+# 시리얼 통신 스레드 함수
+def serial_thread(ser):
+    while True:
+        # 시리얼 통신 코드 작성
+        pass
+
+if __name__ == "__main__":
+    cap = cv2.VideoCapture(0)
+    ser = serial.Serial("/dev/ttyACM0", 4800, timeout=2)
+
+    image_thread = ImageProcessingThread(cap, ser)
+    image_thread.start()
+
+    serial_thread = threading.Thread(target=serial_thread, args=(ser,))
+    serial_thread.start()
+
+    image_thread.join()
+    serial_thread.join()
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+
+
+
+
+
+
+---------------------------------------------------------------------
+
+
+#include <Servo.h>
+
+Servo X2;
+Servo X3;
+
+void setup() {
+  X2.attach(2);
+  X3.attach(3);
+  Serial.begin(4800);
+}
+
+void loop() {
+  if (Serial.available() > 0) {
+    char receivedChar = Serial.read();
+    if (receivedChar == '\n') {
+      String dataString = Serial.readStringUntil('\n');
+      int motorPosition = dataString.toInt();
+      if (motorPosition < 90) motorPosition = 90; // 모터3의 최소 각도를 90도로 설정
+      if (motorPosition > 180) motorPosition = 180; // 모터3의 최대 각도를 180도로 설정
+      X3.write(motorPosition);
+    }
+  }
+}
