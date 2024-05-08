@@ -1,21 +1,21 @@
 #include <Servo.h>
 
 Servo X2; // X 축 서보모터
-Servo X3; // Y 축 서보모터
+Servo X4; // Y 축 서보모터
 
 // 로봇팔의 길이
-const float L1 = 10.0; // X2와 X3 사이의 길이
-const float L2 = 10.0; // X3와 공 사이의 길이
+const float L1 = 160.0; // X2와 X4 사이의 길이
+const float L2 = 110.0; // X4와 공 사이의 길이
 
 unsigned long lastUpdateTime = 0; // 마지막으로 공의 위치를 업데이트한 시간
-const unsigned long updateInterval = 1000; // 공의 위치를 업데이트할 주기 (밀리초)
+const unsigned long updateInterval = 300; // 공의 위치를 업데이트할 주기 (밀리초)
 
 int lastX = 0; // 마지막으로 감지된 공의 X 좌표
 int lastY = 0; // 마지막으로 감지된 공의 Y 좌표
 
 void setup() {
   X2.attach(2); // X2 서보모터를 핀 2에 연결
-  X3.attach(3); // X3 서보모터를 핀 3에 연결
+  X4.attach(4); // X4 서보모터를 핀 3에 연결
   Serial.begin(4800); // 시리얼 통신 시작 (속도는 4800으로 설정)
 }
 
@@ -41,11 +41,11 @@ void loop() {
       
       // 각도를 서보모터 값으로 변환
       int X2_angle = radiansToServo(theta1);
-      int X3_angle = radiansToServo(theta2);
+      int X4_angle = radiansToServo(theta2);
 
       // 각 서보모터를 제어하여 로봇팔을 움직임
       X2.write(X2_angle);
-      X3.write(X3_angle);
+      X4.write(X4_angle);
     }
   }
 
@@ -54,18 +54,18 @@ void loop() {
     // 마지막으로 감지된 좌표로 로봇팔을 이동
     // 제2 코사인 법칙을 이용하여 각도 계산
     float L3 = sqrt(lastX * lastX + lastY * lastY); // 로봇팔 전체 길이 계산
-    float phi2 = acos((L1 * L1 + L2 * L2 - L3 * L3) / (2 * L1 * L2)); // X3와 L3 사이의 각도 계산
+    float phi2 = acos((L1 * L1 + L2 * L2 - L3 * L3) / (2 * L1 * L2)); // X4와 L3 사이의 각도 계산
     float theta2 = PI - phi2; // X3의 각도 계산
     float phi1 = atan2(lastY, lastX); // X2와 L3 사이의 각도 계산
     float theta1 = atan2(L2 * sin(theta2), (L1 + L2 * cos(theta2))); // X2의 각도 계산
     
     // 각도를 서보모터 값으로 변환
     int X2_angle = radiansToServo(theta1);
-    int X3_angle = radiansToServo(theta2);
+    int X4_angle = radiansToServo(theta2);
 
     // 각 서보모터를 제어하여 로봇팔을 움직임
     X2.write(X2_angle);
-    X3.write(X3_angle);
+    X4.write(X4_angle);
   }
 }
 
