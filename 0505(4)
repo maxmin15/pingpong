@@ -1,12 +1,12 @@
 #include <Servo.h>
 
 Servo X2; // X 축 서보모터
-Servo X4; // Y 축 서보모터
+Servo X3; // Y 축 서보모터
 Servo additionalServo; // 추가한 서보모터
 
 // 로봇팔의 길이
-const float L1 = 160.0; 
-const float L2 = 110.0; 
+const float L1 = 160.0; // X2와 X3 사이의 길이
+const float L2 = 110.0; // X3와 공 사이의 길이
 
 // 이전 좌표값 저장 변수
 int prevX = 0;
@@ -16,11 +16,13 @@ int prevY = 0;
 const int additionalServoInitAngle = 90;
 
 unsigned long lastDetectionTime = 0; // 마지막으로 공을 감지한 시간
-const unsigned long detectionInterval = 1000; // 공을 감지하는 간격 (밀리초)
+const unsigned long detectionInterval = 800; // 공을 감지하는 간격 (밀리초)
+
+bool isRotated = false; // 추가된 서보모터가 이미 회전했는지 여부를 나타내는 변수
 
 void setup() {
   X2.attach(2); // X2 서보모터를 핀 2에 연결
-  X4.attach(4); // X3 서보모터를 핀 3에 연결
+  X3.attach(4); // X3 서보모터를 핀 3에 연결
   additionalServo.attach(5); // 추가한 서보모터를 핀 4에 연결
   additionalServo.write(additionalServoInitAngle); // 추가된 서보모터를 초기 각도로 설정
   Serial.begin(4800); // 시리얼 통신 시작 (속도는 4800으로 설정)
@@ -49,21 +51,24 @@ void loop() {
         
         // 각도를 서보모터 값으로 변환
         int X2_angle = radiansToServo(theta1);
-        int X4_angle = radiansToServo(theta2);
+        int X3_angle = radiansToServo(theta2);
 
         // 각 서보모터를 제어하여 로봇팔을 움직임
         X2.write(X2_angle);
-        X4.write(X4_angle);
+        X3.write(X3_angle);
 
         // 공을 감지한 경우 시간을 업데이트
         lastDetectionTime = millis();
+        // 회전을 했으므로 isRotated 변수를 false로 초기화
+        isRotated = false;
       }
     }
   }
 
   // 일정 시간이 지난 후에도 새로운 좌표가 감지되지 않으면 이전의 위치를 계속 사용
-  if (millis() - lastDetectionTime > detectionInterval) {
-    // 공이 1초 동안 감지되지 않았을 때 추가된 서보모터를 30도 회전 후 90도로 다시 원상 복귀
+  if (millis() - lastDetectionTime > detectionInterval && !isRotated) {
+    // 공이 1초 동안 감지되지 않았고, 추가된 서보모터가 아직 회전하지 않은 경우
+    // 추가된 서보모터를 30도 회전 후 90도로 다시 원상 복귀
     checkAndRotate();
   }
 }
@@ -73,20 +78,5 @@ int radiansToServo(float radian) {
   return int((radian * 180.0) / PI);
 }
 
-// 추가된 서보모터를 90도로 이동하는 함수
-void moveAdditionalServoTo90() {
-  additionalServo.write(90);
-}
-
 // 공이 1초 동안 감지되지 않았을 때 추가된 서보모터를 30도 회전 후 90도로 다시 원상 복귀하는 함수
-void checkAndRotate() {
-  // 1초 동안 감지되지 않았을 때
-  if (millis() - lastDetectionTime > detectionInterval) {
-    // 추가된 서보모터를 30도 회전
-    additionalServo.write(30);
-    delay(1000); // 1초간 유지
-    // 추가된 서보모터를 90도로 다시 원상 복귀
-    additionalServo.write(90);
-  }
-}
-
+void
