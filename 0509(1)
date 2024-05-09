@@ -63,8 +63,3 @@ image_thread.join()
 # 리소스 해제
 cap.release()
 cv2.destroyAllWindows()
-
-// 라디안을 서보모터 각도로 변환하는 함수
-int radiansToServo(float radian) {
-  return int((radian * 180.0) / PI);
-}
