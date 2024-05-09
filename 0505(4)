@@ -5,8 +5,8 @@ Servo X3; // Y 축 서보모터
 Servo additionalServo; // 추가한 서보모터
 
 // 로봇팔의 길이
-const float L1 = 10.0; // X2와 X3 사이의 길이
-const float L2 = 10.0; // X3와 공 사이의 길이
+const float L1 = 160.0; // X2와 X3 사이의 길이
+const float L2 = 110.0; // X3와 공 사이의 길이
 
 // 이전 좌표값 저장 변수
 int prevX = 0;
@@ -22,8 +22,8 @@ bool isRotated = false; // 추가된 서보모터가 이미 회전했는지 여�
 
 void setup() {
   X2.attach(2); // X2 서보모터를 핀 2에 연결
-  X3.attach(3); // X3 서보모터를 핀 3에 연결
-  additionalServo.attach(4); // 추가한 서보모터를 핀 4에 연결
+  X3.attach(4); // X3 서보모터를 핀 3에 연결
+  additionalServo.attach(5); // 추가한 서보모터를 핀 4에 연결
   additionalServo.write(additionalServoInitAngle); // 추가된 서보모터를 초기 각도로 설정
   Serial.begin(4800); // 시리얼 통신 시작 (속도는 4800으로 설정)
 }
