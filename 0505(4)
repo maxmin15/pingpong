@@ -1,0 +1,114 @@
+import serial
+import cv2
+import numpy as np
+import threading
+import queue
+
+# 이미지 처리 및 시리얼 통신을 별도의 스레드에서 수행하는 클래스
+class ImageProcessingThread(threading.Thread):
+    def __init__(self, cap, ser, data_queue):
+        threading.Thread.__init__(self)
+        self.cap = cap
+        self.ser = ser
+        self.data_queue = data_queue
+
+    def run(self):
+        while True:
+            ret, frame = self.cap.read()
+            if not ret:
+                break
+            
+            frame = cv2.flip(frame, 1)
+            frame = cv2.resize(frame, (640, 480))
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            orange_lower = np.array([0, 100, 100], np.uint8)
+            orange_upper = np.array([20, 255, 255], np.uint8)
+            mask = cv2.inRange(hsv, orange_lower, orange_upper)
+            contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            contours = sorted(contours, key=lambda x: cv2.contourArea(x), reverse=True)
+
+            if len(contours) > 0:
+                cnt = contours[0]
+                (x, y, w, h) = cv2.boundingRect(cnt)
+                center_x = x + w // 2
+                center_y = y + h // 2
+                coordinate = "{},{}\n".format(center_x, center_y)
+                self.data_queue.put(coordinate)  # 데이터 큐에 좌표 추가
+
+# 시리얼 통신 및 데이터 전송을 별도의 스레드에서 수행하는 클래스
+class SerialCommunicationThread(threading.Thread):
+    def __init__(self, ser, data_queue):
+        threading.Thread.__init__(self)
+        self.ser = ser
+        self.data_queue = data_queue
+
+    def run(self):
+        while True:
+            if not self.data_queue.empty():
+                coordinate = self.data_queue.get()  # 데이터 큐에서 좌표 가져오기
+                self.ser.write(coordinate.encode())  # 시리얼 통신으로 좌표 전송
+
+# 시리얼 통신 설정
+ser = serial.Serial("/dev/ttyACM0", 4800, timeout=2)
+
+# 카메라 설정
+cap = cv2.VideoCapture(0)
+
+# 데이터 큐 생성
+data_queue = queue.Queue(maxsize=1)  # 큐의 최대 크기를 1로 설정하여 데이터가 즉시 처리되도록 함
+
+# 이미지 처리 스레드 시작
+image_thread = ImageProcessingThread(cap, ser, data_queue)
+image_thread.start()
+
+# 시리얼 통신 스레드 시작
+serial_thread = SerialCommunicationThread(ser, data_queue)
+serial_thread.start()
+
+# 메인 스레드 종료 대기
+image_thread.join()
+serial_thread.join()
+
+# 리소스 해제
+cap.release()
+cv2.destroyAllWindows()
+
+
+
+
+#include <Servo.h>
+
+Servo X2; // X 축 서보모터
+Servo X3; // Y 축 서보모터
+
+// 로봇팔의 길이
+const float L1 = 160.0; // X2와 X3 사이의 길이
+const float L2 = 11.0; // X3와 공 사이의 길이
+
+void setup() {
+  X2.attach(2); // X2 서보모터를 핀 2에 연결
+  X3.attach(4); // X3 서보모터를 핀 3에 연결
+  Serial.begin(4800); // 시리얼 통신 시작 (속도는 4800으로 설정)
+}
+
+void loop() {
+  if (Serial.available() > 0) {
+    String data = Serial.readStringUntil('\n'); // 시리얼로부터 데이터 읽기
+    int commaIndex = data.indexOf(','); // 쉼표 위치 찾기
+    if (commaIndex != -1) { // 쉼표가 있는지 확인
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
