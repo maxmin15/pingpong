@@ -1,0 +1,60 @@
+// 수위 센서와 모터 드라이버 핀 설정
+const int waterSensorPin = A0;  // 수위 센서 핀
+const int motorPin1 = 2;        // 모터 드라이버 IN1 핀
+const int motorPin2 = 3;        // 모터 드라이버 IN2 핀
+
+// 수위 임계값 설정 (예: 500 이상이면 모터 동작)
+const int threshold = 500;
+
+// 모터 동작 시간 (밀리초)
+const int motorRunTime = 5000;
+
+// 모터 동작 여부 확인 변수
+bool motorActivated = false;
+
+void setup() {
+  // 시리얼 통신 시작
+  Serial.begin(9600);
+  
+  // 모터 핀을 출력으로 설정
+  pinMode(motorPin1, OUTPUT);
+  pinMode(motorPin2, OUTPUT);
+  
+  // 모터 초기 상태 OFF
+  digitalWrite(motorPin1, LOW);
+  digitalWrite(motorPin2, LOW);
+}
+
+void loop() {
+  // 모터가 이미 작동했는지 확인
+  if (!motorActivated) {
+    // 수위 센서 값 읽기
+    int sensorValue = analogRead(waterSensorPin);
+    
+    // 수위 센서 값 출력
+    Serial.print("Water Level: ");
+    Serial.println(sensorValue);
+    
+    // 수위 임계값을 넘으면 모터 동작
+    if (sensorValue >= threshold) {
+      // 모터 동작 (예: 정방향 회전)
+      digitalWrite(motorPin1, HIGH);
+      digitalWrite(motorPin2, LOW);
+      Serial.println("Motor ON");
+
+      // 모터를 5초간 작동
+      delay(motorRunTime);
+
+      // 모터 정지
+      digitalWrite(motorPin1, LOW);
+      digitalWrite(motorPin2, LOW);
+      Serial.println("Motor OFF");
+
+      // 모터가 이미 작동했음을 표시
+      motorActivated = true;
+    }
+  }
+
+  // 짧은 딜레이 후 루프 반복
+  delay(500);
+}
