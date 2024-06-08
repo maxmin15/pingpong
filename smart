@@ -2,6 +2,7 @@
 const int waterSensorPin = A0;  // 수위 센서 핀
 const int motorPin1 = 2;        // 모터 드라이버 IN1 핀
 const int motorPin2 = 3;        // 모터 드라이버 IN2 핀
+const int enablePin = 9;        // 모터 드라이버 ENA 핀
 
 // 수위 임계값 설정 (예: 500 이상이면 모터 동작)
 const int threshold = 500;
@@ -19,10 +20,12 @@ void setup() {
   // 모터 핀을 출력으로 설정
   pinMode(motorPin1, OUTPUT);
   pinMode(motorPin2, OUTPUT);
+  pinMode(enablePin, OUTPUT);
   
   // 모터 초기 상태 OFF
   digitalWrite(motorPin1, LOW);
   digitalWrite(motorPin2, LOW);
+  digitalWrite(enablePin, LOW);
 }
 
 void loop() {
@@ -40,6 +43,7 @@ void loop() {
       // 모터 동작 (예: 정방향 회전)
       digitalWrite(motorPin1, HIGH);
       digitalWrite(motorPin2, LOW);
+      analogWrite(enablePin, 255);  // 모터 최대 속도
       Serial.println("Motor ON");
 
       // 모터를 5초간 작동
@@ -48,6 +52,7 @@ void loop() {
       // 모터 정지
       digitalWrite(motorPin1, LOW);
       digitalWrite(motorPin2, LOW);
+      analogWrite(enablePin, 0);  // 모터 정지
       Serial.println("Motor OFF");
 
       // 모터가 이미 작동했음을 표시
