@@ -1,0 +1,122 @@
+// 모터 드라이버 핀 설정
+int in1Pin = 2;
+int in2Pin = 3;
+int enaPin = 9;
+
+// 수위 센서 핀 설정
+int waterLevelSensorPin = A0;
+
+// 초음파 센서 핀 설정
+int trigPin = 6;
+int echoPin = 7;
+
+// LED와 부저 핀 설정
+int ledPin = 13;
+int buzzerPin = 8; // 부저 연결 핀
+
+unsigned long motorStartTime = 0;
+unsigned long motorRunTime = 0;
+bool motorRunning = false;
+bool firstTrigger = false;
+int initialWaterLevel = 0;
+
+void setup() {
+  pinMode(in1Pin, OUTPUT);
+  pinMode(in2Pin, OUTPUT);
+  pinMode(enaPin, OUTPUT);
+  pinMode(ledPin, OUTPUT);
+  pinMode(buzzerPin, OUTPUT);
+
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+
+  digitalWrite(in1Pin, LOW);
+  digitalWrite(in2Pin, LOW);
+  digitalWrite(ledPin, LOW);
+  digitalWrite(buzzerPin, LOW);
+
+  Serial.begin(9600);
+}
+
+void loop() {
+  // 시리얼 데이터가 있는지 확인
+  if (Serial.available() > 0) {
+    String command = Serial.readStringUntil('\n');
+    if (command == "BUZZ") {
+      activateBuzzer();  // 부저 울리기
+    }
+  }
+  // 기존 모터, 수위, 초음파 관련 로직 유지
+  delay(100); 
+}
+
+void activateBuzzer() {
+  digitalWrite(buzzerPin, HIGH);
+  delay(500);  // 부저 울리는 시간 (0.5초)
+  digitalWrite(buzzerPin, LOW);
+}
+
+int readUltrasonicDistance() {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  long duration = pulseIn(echoPin, HIGH);
+  return duration * 0.034 / 2;
+}
+
+
+
+____________________________________________________
+
+import serial
+import cv2
+import numpy as np
+import threading
+
+class ImageProcessingThread(threading.Thread):
+    def __init__(self, cap, ser):
+        threading.Thread.__init__(self)
+        self.cap = cap
+        self.ser = ser
+
+    def run(self):
+        while True:
+            _, frame = self.cap.read()
+            frame = cv2.flip(frame, 1)
+            frame = cv2.resize(frame, (640, 480))
+
+            # HSV 색공간으로 변환 후 주황색 범위 설정
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            orange_lower = np.array([10, 100, 20], np.uint8)
+            orange_upper = np.array([25, 255, 255], np.uint8)
+            mask = cv2.inRange(hsv, orange_lower, orange_upper)
+
+            # 주황색 객체 찾기
+            contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            contours = sorted(contours, key=lambda x: cv2.contourArea(x), reverse=True)
+
+            if contours:
+                (x, y, w, h) = cv2.boundingRect(contours[0])
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+                # 주황색 공 인식 시 부저 신호 전송
+                self.ser.write(b'BUZZ\n')
+
+            cv2.imshow("Frame", frame)
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+if __name__ == "__main__":
+    cap = cv2.VideoCapture(0)
+    ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1)
+
+    image_thread = ImageProcessingThread(cap, ser)
+    image_thread.start()
+
+    image_thread.join()
+    cap.release()
+    cv2.destroyAllWindows()
