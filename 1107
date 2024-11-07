@@ -1,0 +1,261 @@
+// 모터 드라이버 핀 설정
+
+int in1Pin = 2;
+
+int in2Pin = 3;
+
+int enaPin = 9;
+
+ 
+
+// 수위 센서 핀 설정
+
+int waterLevelSensorPin = A0;
+
+ 
+
+// 초음파 센서 핀 설정
+
+int trigPin = 6;
+
+int echoPin = 7;
+
+ 
+
+// LED 핀 설정
+
+int ledPin = 13; // 사용할 LED 핀 번호
+
+ 
+
+// 모터 작동 시간 측정을 위한 변수
+
+unsigned long motorStartTime = 0;
+
+unsigned long motorRunTime = 0; // 모터가 올라간 시간 저장
+
+bool motorRunning = false;
+
+bool firstTrigger = false;
+
+int initialWaterLevel = 0;
+
+ 
+
+void setup() {
+
+  // 모터 드라이버 핀을 출력으로 설정
+
+  pinMode(in1Pin, OUTPUT);
+
+  pinMode(in2Pin, OUTPUT);
+
+  pinMode(enaPin, OUTPUT);
+
+ 
+
+  // LED 핀을 출력으로 설정
+
+  pinMode(ledPin, OUTPUT);
+
+ 
+
+  // 초음파 센서 핀 설정
+
+  pinMode(trigPin, OUTPUT);
+
+  pinMode(echoPin, INPUT);
+
+ 
+
+  // 모터와 LED 정지
+
+  digitalWrite(in1Pin, LOW);
+
+  digitalWrite(in2Pin, LOW);
+
+  digitalWrite(ledPin, LOW);
+
+ 
+
+  // 초음파 센서 TRIG 핀 초기화
+
+  digitalWrite(trigPin, LOW);
+
+  delayMicroseconds(2);
+
+ 
+
+  // 초기 수위 센서 값 측정
+
+  initialWaterLevel = analogRead(waterLevelSensorPin);
+
+ 
+
+  // 시리얼 통신 시작
+
+  Serial.begin(9600);
+
+}
+
+ 
+
+void loop() {
+
+  // 수위 센서 값 읽기
+
+  int waterLevel = analogRead(waterLevelSensorPin);
+
+ 
+
+  // 초음파 센서 값 읽기
+
+  int distance = readUltrasonicDistance();
+
+  Serial.print("Distance: ");
+
+  Serial.print(distance);
+
+  Serial.println(" cm");
+
+ 
+
+  // 현재 시간 확인
+
+  unsigned long currentTime = millis();
+
+ 
+
+  // 모터가 작동 중이지 않고 수위가 일정 수준을 넘었을 때
+
+  if (!motorRunning && waterLevel > 302 && !firstTrigger) {
+
+    firstTrigger = true;
+
+    motorStartTime = currentTime; // 모터 작동 시작 시간 기록
+
+    motorRunning = true;
+
+    digitalWrite(ledPin, HIGH); // 수위 감지 시 LED 켜기
+
+ 
+
+    // 모터 정방향으로 작동
+
+    digitalWrite(in1Pin, HIGH);
+
+    digitalWrite(in2Pin, LOW);
+
+    int motorSpeed = 255; // 최대 속도로 설정
+
+    analogWrite(enaPin, motorSpeed);
+
+ 
+
+    // 모터 작동 시간 기록
+
+    motorStartTime = currentTime;
+
+  }
+
+ 
+
+  // 모터가 작동 중인지 확인
+
+  if (motorRunning) {
+
+    // 현재 시간과 모터 시작 시간 비교
+
+    unsigned long elapsedTime = currentTime - motorStartTime;
+
+    if (elapsedTime > 2000) { // 5초 이상 경과한 후
+
+      // 초음파 센서로 천장과의 거리 확인
+
+      if (distance < 10) { // 천장과 거리가 10cm 이하일 때
+
+        // 모터 작동 시간 기록
+
+        motorRunTime = elapsedTime;
+
+ 
+
+        // 모터 정지
+
+        digitalWrite(in1Pin, LOW);
+
+        digitalWrite(in2Pin, LOW);
+
+        delay(30000); // 30초 대기
+
+        digitalWrite(ledPin, LOW); // LED 끄기
+
+ 
+
+        // 내려가기 시작
+
+        digitalWrite(in1Pin, LOW);
+
+        digitalWrite(in2Pin, HIGH);
+
+        analogWrite(enaPin, 255); // 최대 속도로 설정
+
+ 
+
+        // 올라간 시간만큼 내려가기
+
+        delay(motorRunTime);
+
+ 
+
+        // 모터 정지
+
+        digitalWrite(in1Pin, LOW);
+
+        digitalWrite(in2Pin, LOW);
+
+        motorRunning = false;
+
+        firstTrigger = false;
+
+      }
+
+    }
+
+  }
+
+ 
+
+  delay(100); // 일정 시간 간격으로 센서 값을 확인하고 모터를 조절합니다.
+
+}
+
+ 
+
+// 초음파 센서로 거리 측정 함수
+
+int readUltrasonicDistance() {
+
+  digitalWrite(trigPin, LOW);
+
+  delayMicroseconds(2);
+
+  digitalWrite(trigPin, HIGH);
+
+  delayMicroseconds(10);
+
+  digitalWrite(trigPin, LOW);
+
+ 
+
+  long duration = pulseIn(echoPin, HIGH);
+
+  int distance = duration * 0.034 / 2;
+
+ 
+
+  return distance;
+
+}
+
+주고 받은 메일2개전체보기
