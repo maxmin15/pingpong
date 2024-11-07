@@ -1,0 +1,97 @@
+// 모터 드라이버 핀 설정
+int in1Pin = 2;
+int in2Pin = 3;
+int enaPin = 9;
+
+// 수위 센서 핀 설정
+int waterLevelSensorPin = A0;
+
+// 초음파 센서 핀 설정
+int trigPin = 6;
+int echoPin = 7;
+
+// LED와 부저 핀 설정
+int ledPin = 13;
+int buzzerPin = 8; // 부저 연결 핀
+
+unsigned long motorStartTime = 0;
+unsigned long motorRunTime = 5000; // 모터 실행 시간 설정
+bool motorRunning = false;
+bool firstTrigger = false;
+bool buzzerActive = false;  // 부저 상태 추적
+unsigned long buzzerStartTime = 0;  // 부저 울림 시작 시간
+
+void setup() {
+  pinMode(in1Pin, OUTPUT);
+  pinMode(in2Pin, OUTPUT);
+  pinMode(enaPin, OUTPUT);
+  pinMode(ledPin, OUTPUT);
+  pinMode(buzzerPin, OUTPUT);
+
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+
+  digitalWrite(in1Pin, LOW);
+  digitalWrite(in2Pin, LOW);
+  digitalWrite(ledPin, LOW);
+  digitalWrite(buzzerPin, LOW);
+
+  Serial.begin(9600);
+}
+
+void loop() {
+  // 시리얼 데이터가 있는지 확인
+  if (Serial.available() > 0) {
+    String command = Serial.readStringUntil('\n');
+    if (command == "BUZZ" && !buzzerActive) {
+      activateBuzzer();  // 부저 울리기
+      startMotor();  // 모터 작동
+    }
+  }
+
+  // 부저가 울리는 중인지 확인
+  if (buzzerActive) {
+    if (millis() - buzzerStartTime >= 3000) {  // 3초가 지나면
+      digitalWrite(buzzerPin, LOW);  // 부저 끄기
+      buzzerActive = false;
+    }
+  }
+
+  // 모터 작동 시간이 다 되면 모터 끄기
+  if (motorRunning && millis() - motorStartTime >= motorRunTime) {
+    stopMotor();
+  }
+
+  delay(100);  // 센서 데이터 확인 주기
+}
+
+void activateBuzzer() {
+  digitalWrite(buzzerPin, HIGH);  // 부저 켜기
+  buzzerStartTime = millis();  // 울리기 시작 시간 기록
+  buzzerActive = true;
+}
+
+void startMotor() {
+  digitalWrite(in1Pin, HIGH);  // 모터의 한쪽 방향 설정
+  digitalWrite(in2Pin, LOW);
+  analogWrite(enaPin, 255);  // 모터 속도 설정 (최대 속도)
+  motorStartTime = millis();
+  motorRunning = true;
+}
+
+void stopMotor() {
+  digitalWrite(in1Pin, LOW);  // 모터 정지
+  digitalWrite(in2Pin, LOW);
+  motorRunning = false;
+}
+
+int readUltrasonicDistance() {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  long duration = pulseIn(echoPin, HIGH);
+  return duration * 0.034 / 2;
+}
