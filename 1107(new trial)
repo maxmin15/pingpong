@@ -11,15 +11,18 @@ int trigPin = 6;
 int echoPin = 7;
 
 // LED와 부저 핀 설정
-int ledPin = 13;
-int buzzerPin = 8; // 부저 연결 핀
+int ledPin = 13; // 사용할 LED 핀 번호
+int buzzerPin = 8; // 부저 핀
 
+// 모터 작동 시간 측정을 위한 변수
 unsigned long motorStartTime = 0;
-unsigned long motorRunTime = 5000; // 모터 실행 시간 설정
+unsigned long motorRunTime = 0; // 모터가 올라간 시간 저장
 bool motorRunning = false;
 bool firstTrigger = false;
-bool buzzerActive = false;  // 부저 상태 추적
-unsigned long buzzerStartTime = 0;  // 부저 울림 시작 시간
+int initialWaterLevel = 0;
+
+bool buzzerActive = false;
+unsigned long buzzerStartTime = 0;
 
 void setup() {
   pinMode(in1Pin, OUTPUT);
@@ -40,49 +43,26 @@ void setup() {
 }
 
 void loop() {
-  // 시리얼 데이터가 있는지 확인
   if (Serial.available() > 0) {
     String command = Serial.readStringUntil('\n');
     if (command == "BUZZ" && !buzzerActive) {
-      activateBuzzer();  // 부저 울리기
-      startMotor();  // 모터 작동
+      activateBuzzer();
     }
   }
 
-  // 부저가 울리는 중인지 확인
-  if (buzzerActive) {
-    if (millis() - buzzerStartTime >= 3000) {  // 3초가 지나면
-      digitalWrite(buzzerPin, LOW);  // 부저 끄기
-      buzzerActive = false;
-    }
+  // 부저가 활성화되었을 때 3초 동안 울림
+  if (buzzerActive && millis() - buzzerStartTime >= 3000) {
+    digitalWrite(buzzerPin, LOW);
+    buzzerActive = false;
   }
 
-  // 모터 작동 시간이 다 되면 모터 끄기
-  if (motorRunning && millis() - motorStartTime >= motorRunTime) {
-    stopMotor();
-  }
-
-  delay(100);  // 센서 데이터 확인 주기
+  delay(100);
 }
 
 void activateBuzzer() {
-  digitalWrite(buzzerPin, HIGH);  // 부저 켜기
-  buzzerStartTime = millis();  // 울리기 시작 시간 기록
+  digitalWrite(buzzerPin, HIGH);
+  buzzerStartTime = millis();
   buzzerActive = true;
-}
-
-void startMotor() {
-  digitalWrite(in1Pin, HIGH);  // 모터의 한쪽 방향 설정
-  digitalWrite(in2Pin, LOW);
-  analogWrite(enaPin, 255);  // 모터 속도 설정 (최대 속도)
-  motorStartTime = millis();
-  motorRunning = true;
-}
-
-void stopMotor() {
-  digitalWrite(in1Pin, LOW);  // 모터 정지
-  digitalWrite(in2Pin, LOW);
-  motorRunning = false;
 }
 
 int readUltrasonicDistance() {
@@ -95,3 +75,73 @@ int readUltrasonicDistance() {
   long duration = pulseIn(echoPin, HIGH);
   return duration * 0.034 / 2;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import serial
+import cv2
+import numpy as np
+import threading
+import time
+
+# 이미지 처리 스레드 클래스
+class ImageProcessingThread(threading.Thread):
+    def __init__(self, cap, ser):
+        threading.Thread.__init__(self)
+        self.cap = cap
+        self.ser = ser
+        self.last_detected_time = 0  # 마지막 감지 시간 저장
+
+    def run(self):
+        while True:
+            _, frame = self.cap.read()
+            frame = cv2.flip(frame, 1)
+            frame = cv2.resize(frame, (640, 480))
+
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            orange_lower = np.array([10, 100, 20], np.uint8)
+            orange_upper = np.array([25, 255, 255], np.uint8)
+            mask = cv2.inRange(hsv, orange_lower, orange_upper)
+
+            contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            contours = sorted(contours, key=lambda x: cv2.contourArea(x), reverse=True)
+
+            if contours:
+                (x, y, w, h) = cv2.boundingRect(contours[0])
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+                current_time = time.time()
+                if current_time - self.last_detected_time > 5:  # 5초 간격으로 BUZZ 전송
+                    self.ser.write(b'BUZZ\n')
+                    self.last_detected_time = current_time  # 감지 시간 갱신
+
+            cv2.imshow("Frame", frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+# 메인 함수
+if __name__ == "__main__":
+    cap = cv2.VideoCapture(0)
+    ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1)
+
+    image_thread = ImageProcessingThread(cap, ser)
+    image_thread.start()
+
+    image_thread.join()
+    cap.release()
+    cv2.destroyAllWindows()
