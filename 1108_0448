@@ -1,0 +1,169 @@
+// 모터 드라이버 핀 설정
+int in1Pin = 2;
+int in2Pin = 3;
+int enaPin = 9;
+
+// 수위 센서 핀 설정
+int waterLevelSensorPin = A0;
+
+// 초음파 센서 핀 설정
+int trigPin = 6;
+int echoPin = 7;
+
+// LED 및 부저 핀 설정
+int ledPin = 13;
+int buzzerPin = 8; // 부저 핀 번호 추가
+
+// 모터 작동 시간 측정을 위한 변수
+unsigned long motorStartTime = 0;
+unsigned long motorRunTime = 0;
+bool motorRunning = false;
+bool firstTrigger = false;
+int initialWaterLevel = 0;
+
+void setup() {
+  pinMode(in1Pin, OUTPUT);
+  pinMode(in2Pin, OUTPUT);
+  pinMode(enaPin, OUTPUT);
+  pinMode(ledPin, OUTPUT);
+  pinMode(buzzerPin, OUTPUT); // 부저 핀 출력으로 설정
+
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+
+  digitalWrite(in1Pin, LOW);
+  digitalWrite(in2Pin, LOW);
+  digitalWrite(ledPin, LOW);
+  digitalWrite(buzzerPin, LOW); // 부저 초기화
+
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+
+  initialWaterLevel = analogRead(waterLevelSensorPin);
+
+  Serial.begin(9600);
+}
+
+void loop() {
+  int waterLevel = analogRead(waterLevelSensorPin);
+  int distance = readUltrasonicDistance();
+  unsigned long currentTime = millis();
+
+  if (!motorRunning && waterLevel > 302 && !firstTrigger) {
+    firstTrigger = true;
+    motorStartTime = currentTime;
+    motorRunning = true;
+    digitalWrite(ledPin, HIGH);
+    digitalWrite(in1Pin, HIGH);
+    digitalWrite(in2Pin, LOW);
+    analogWrite(enaPin, 255);
+    motorStartTime = currentTime;
+  }
+
+  if (motorRunning) {
+    unsigned long elapsedTime = currentTime - motorStartTime;
+    if (elapsedTime > 2000) {
+      if (distance < 10) {
+        motorRunTime = elapsedTime;
+        digitalWrite(in1Pin, LOW);
+        digitalWrite(in2Pin, LOW);
+        delay(30000);
+        digitalWrite(ledPin, LOW);
+
+        digitalWrite(in1Pin, LOW);
+        digitalWrite(in2Pin, HIGH);
+        analogWrite(enaPin, 255);
+        delay(motorRunTime);
+        
+        digitalWrite(in1Pin, LOW);
+        digitalWrite(in2Pin, LOW);
+        motorRunning = false;
+        firstTrigger = false;
+      }
+    }
+  }
+
+  if (Serial.available() > 0) {
+    String command = Serial.readString();
+    if (command == "BUZZ\n") {
+      digitalWrite(buzzerPin, HIGH);
+      delay(2000); // 2초간 부저 울림
+      digitalWrite(buzzerPin, LOW);
+    }
+  }
+
+  delay(100);
+}
+
+int readUltrasonicDistance() {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  long duration = pulseIn(echoPin, HIGH);
+  int distance = duration * 0.034 / 2;
+
+  return distance;
+}
+
+
+
+
+
+
+
+
+import serial
+import cv2
+import numpy as np
+import threading
+import time
+
+class ImageProcessingThread(threading.Thread):
+    def __init__(self, cap, ser):
+        threading.Thread.__init__(self)
+        self.cap = cap
+        self.ser = ser
+        self.last_detected_time = 0  # 마지막 감지 시간 저장
+
+    def run(self):
+        while True:
+            _, frame = self.cap.read()
+            frame = cv2.flip(frame, 1)
+            frame = cv2.resize(frame, (640, 480))
+
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            orange_lower = np.array([0, 100, 100], np.uint8) 
+            orange_upper = np.array([25, 255, 255], np.uint8)
+            mask = cv2.inRange(hsv, orange_lower, orange_upper)
+
+            contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            contours = sorted(contours, key=lambda x: cv2.contourArea(x), reverse=True)
+
+            if contours:
+                (x, y, w, h) = cv2.boundingRect(contours[0])
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+                current_time = time.time()
+                if current_time - self.last_detected_time > 5:
+                    self.ser.write(b'BUZZ\n')
+                    self.last_detected_time = current_time
+
+            cv2.imshow("Frame", frame)
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+if __name__ == "__main__":
+    cap = cv2.VideoCapture(0)
+    ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1)
+
+    image_thread = ImageProcessingThread(cap, ser)
+    image_thread.start()
+
+    image_thread.join()
+    cap.release()
+    cv2.destroyAllWindows()
+
