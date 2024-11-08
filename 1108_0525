@@ -1,0 +1,194 @@
+// 모터 드라이버 핀 설정
+int in1Pin = 2;
+int in2Pin = 3;
+int enaPin = 9;
+
+// 수위 센서 핀 설정
+int waterLevelSensorPin = A0;
+
+// 초음파 센서 핀 설정
+int trigPin = 6;
+int echoPin = 7;
+
+// LED 및 부저 핀 설정
+int ledPin = 13;
+int buzzerPin = 8;
+
+// 모터 작동 시간 측정을 위한 변수
+unsigned long motorStartTime = 0;
+unsigned long motorRunTime = 0;
+bool motorRunning = false;
+bool firstTrigger = false;
+bool ultrasonicPaused = false;  // 초음파 대기 상태
+bool buzzerActivated = false;   // 부저 작동 상태 플래그
+int initialWaterLevel = 0;
+
+void setup() {
+  // 모터, LED 및 부저 핀을 출력으로 설정
+  pinMode(in1Pin, OUTPUT);
+  pinMode(in2Pin, OUTPUT);
+  pinMode(enaPin, OUTPUT);
+  pinMode(ledPin, OUTPUT);
+  pinMode(buzzerPin, OUTPUT);
+
+  // 초음파 센서 핀 설정
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+
+  // 초기 상태 설정
+  digitalWrite(in1Pin, LOW);
+  digitalWrite(in2Pin, LOW);
+  digitalWrite(ledPin, LOW);
+  digitalWrite(buzzerPin, LOW);
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+
+  // 초기 수위 측정
+  initialWaterLevel = analogRead(waterLevelSensorPin);
+
+  // 시리얼 통신 시작
+  Serial.begin(9600);
+}
+
+void loop() {
+  int waterLevel = analogRead(waterLevelSensorPin);
+  int distance = readUltrasonicDistance();
+  unsigned long currentTime = millis();
+
+  // 수위가 일정 수준을 넘었을 때 모터 작동
+  if (!motorRunning && waterLevel > 302 && !firstTrigger) {
+    firstTrigger = true;
+    motorStartTime = currentTime;
+    motorRunning = true;
+    digitalWrite(ledPin, HIGH);
+
+    // 모터 정방향으로 작동
+    digitalWrite(in1Pin, HIGH);
+    digitalWrite(in2Pin, LOW);
+    analogWrite(enaPin, 255);
+  }
+
+  // 모터가 작동 중일 때 상태 확인
+  if (motorRunning) {
+    unsigned long elapsedTime = currentTime - motorStartTime;
+
+    if (elapsedTime > 2000 && distance < 10) { // 10cm 이하 거리 감지 시
+      motorRunTime = elapsedTime;
+      ultrasonicPaused = true;  // 초음파로 인한 대기 시작
+
+      // 모터 정지 및 대기
+      digitalWrite(in1Pin, LOW);
+      digitalWrite(in2Pin, LOW);
+      delay(30000); // 30초 대기
+      ultrasonicPaused = false;  // 대기 종료 후 플래그 해제
+      digitalWrite(ledPin, LOW);
+
+      // 모터 반대로 작동하여 내려가기
+      digitalWrite(in1Pin, LOW);
+      digitalWrite(in2Pin, HIGH);
+      analogWrite(enaPin, 255);
+      delay(motorRunTime);
+
+      // 모터 정지
+      digitalWrite(in1Pin, LOW);
+      digitalWrite(in2Pin, LOW);
+      motorRunning = false;
+      firstTrigger = false;
+    }
+  }
+
+  // 시리얼 입력을 통해 BUZZ 명령이 들어오면 부저 작동 플래그 설정
+  if (Serial.available() > 0) {
+    String command = Serial.readString();
+    if (command == "BUZZ\n") {
+      buzzerActivated = true;
+    }
+  }
+
+  // 부저 작동 플래그가 설정된 경우 부저 작동
+  if (buzzerActivated) {
+    digitalWrite(buzzerPin, HIGH);
+    delay(2000); // 부저 2초간 울림
+    digitalWrite(buzzerPin, LOW);
+    buzzerActivated = false; // 부저 작동 후 플래그 해제
+  }
+
+  delay(100);
+}
+
+// 초음파 센서 거리 측정 함수
+int readUltrasonicDistance() {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  long duration = pulseIn(echoPin, HIGH);
+  int distance = duration * 0.034 / 2;
+  return distance;
+}
+
+
+
+
+
+
+
+
+
+import serial
+import cv2
+import numpy as np
+import threading
+import time
+
+class ImageProcessingThread(threading.Thread):
+    def __init__(self, cap, ser):
+        threading.Thread.__init__(self)
+        self.cap = cap
+        self.ser = ser
+        self.last_detected_time = 0
+
+    def run(self):
+        while True:
+            _, frame = self.cap.read()
+            frame = cv2.flip(frame, 1)
+            frame = cv2.resize(frame, (640, 480))
+
+            # HSV 색공간으로 변환 후 주황색 범위 설정
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            orange_lower = np.array([0, 100, 100], np.uint8) 
+            orange_upper = np.array([25, 255, 255], np.uint8)
+            mask = cv2.inRange(hsv, orange_lower, orange_upper)
+
+            # 주황색 객체 찾기
+            contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            contours = sorted(contours, key=lambda x: cv2.contourArea(x), reverse=True)
+
+            if contours:
+                (x, y, w, h) = cv2.boundingRect(contours[0])
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+                # 주황색 공이 감지되었을 때 BUZZ 명령 전송 (5초 간격으로)
+                current_time = time.time()
+                if current_time - self.last_detected_time > 5:
+                    self.ser.write(b'BUZZ\n')
+                    self.last_detected_time = current_time  # 감지 시간 갱신
+
+            cv2.imshow("Frame", frame)
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+if __name__ == "__main__":
+    cap = cv2.VideoCapture(0)
+    ser = serial.Serial("/dev/ttyACM0", 9600, timeout=1)
+
+    image_thread = ImageProcessingThread(cap, ser)
+    image_thread.start()
+
+    image_thread.join()
+    cap.release()
+    cv2.destroyAllWindows()
+
