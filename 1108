@@ -1,0 +1,122 @@
+// 모터 드라이버 핀 설정
+int in1Pin = 2;
+int in2Pin = 3;
+int enaPin = 9;
+
+// 수위 센서 핀 설정
+int waterLevelSensorPin = A0;
+
+// 초음파 센서 핀 설정
+int trigPin = 6;
+int echoPin = 7;
+
+// LED와 부저 핀 설정
+int ledPin = 13;
+int buzzerPin = 8;
+
+// 모터 및 부저 작동 시간 관리 변수
+unsigned long motorStartTime = 0;
+unsigned long motorRunTime = 0;
+unsigned long buzzerStartTime = 0;
+bool motorRunning = false;
+bool firstTrigger = false;
+bool buzzerActive = false;
+int initialWaterLevel = 0;
+
+void setup() {
+  pinMode(in1Pin, OUTPUT);
+  pinMode(in2Pin, OUTPUT);
+  pinMode(enaPin, OUTPUT);
+  pinMode(ledPin, OUTPUT);
+  pinMode(buzzerPin, OUTPUT);
+
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+
+  digitalWrite(in1Pin, LOW);
+  digitalWrite(in2Pin, LOW);
+  digitalWrite(ledPin, LOW);
+  digitalWrite(buzzerPin, LOW);
+
+  Serial.begin(9600);
+
+  initialWaterLevel = analogRead(waterLevelSensorPin);
+}
+
+void loop() {
+  int waterLevel = analogRead(waterLevelSensorPin);
+  unsigned long currentTime = millis();
+
+  // 모터 제어: 수위가 높고 모터가 작동 중이지 않으면 모터 작동 시작
+  if (!motorRunning && waterLevel > initialWaterLevel + 100 && !firstTrigger) {
+    firstTrigger = true;
+    motorStartTime = currentTime;
+    motorRunning = true;
+
+    digitalWrite(ledPin, HIGH); // 수위 감지 시 LED 켜기
+    digitalWrite(in1Pin, HIGH);
+    digitalWrite(in2Pin, LOW);
+    analogWrite(enaPin, 255); // 최대 속도로 모터 작동
+  }
+
+  // 모터 작동 중이라면
+  if (motorRunning) {
+    if (currentTime - motorStartTime >= 5000) {  // 5초 이상 경과하면
+      int distance = readUltrasonicDistance();
+      if (distance < 10) { // 천장과의 거리 확인 (10cm 이하일 때)
+        motorRunTime = currentTime - motorStartTime;
+
+        digitalWrite(in1Pin, LOW);
+        digitalWrite(in2Pin, LOW);
+        delay(30000); // 30초 대기
+        digitalWrite(ledPin, LOW);
+
+        // 모터를 내려가게 함
+        digitalWrite(in1Pin, LOW);
+        digitalWrite(in2Pin, HIGH);
+        analogWrite(enaPin, 255);
+        delay(motorRunTime);
+
+        digitalWrite(in1Pin, LOW);
+        digitalWrite(in2Pin, LOW);
+        motorRunning = false;
+        firstTrigger = false;
+      }
+    }
+  }
+
+  // 부저 제어: 카메라에서 BUZZ 신호가 오면 2초간 울림
+  if (Serial.available() > 0) {
+    String command = Serial.readStringUntil('\n');
+    if (command == "BUZZ" && !buzzerActive) {
+      activateBuzzer();
+    }
+  }
+
+  // 부저가 활성화되었을 때 2초 동안 울림
+  if (buzzerActive && currentTime - buzzerStartTime >= 2000) {
+    digitalWrite(buzzerPin, LOW);
+    buzzerActive = false;
+  }
+
+  delay(100); // 센서 업데이트 간격
+}
+
+// 부저 활성화 함수
+void activateBuzzer() {
+  digitalWrite(buzzerPin, HIGH);
+  buzzerStartTime = millis();
+  buzzerActive = true;
+}
+
+// 초음파 센서로 거리 측정 함수
+int readUltrasonicDistance() {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  long duration = pulseIn(echoPin, HIGH);
+  return duration * 0.034 / 2;
+}
